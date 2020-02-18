@@ -28,58 +28,66 @@ def vogel_penalties(cost, n, m):
 # method to perform vogel's approximation
 def vogel_approximation(cost, n, m, supply, demand):
     
-    # X is storing values of x[i,j] and h is a hashmap for all variables whose values have been defined
-    X = np.zeros((n.m))
-    h, lt = X, n*m
+    # X is storing values of x[i,j]
+    X = np.zeros((n,m))
 
     cost_t = cost.transpose()
 
-    # applying approximation till entire hash-map is filled
-    while sum(h) < lt:
+    # applying till all supplies are transported, as problem is balanced
+    while sum(supply) > 0:
 
         # getting the penalties
         t = vogel_penalties(cost, n, m)
 
         # if one of the rows has greatest pernalty
         if t[0] == 0:
-            least_cost = np.argmin(cost[t[1]])
+            least_cost_index = np.argmin(cost[t[1]])
 
-            if supply[t[1]] > demand[least_cost]:
-                X[t[1], least_cost] = demand[least_cost]
+            if supply[t[1]] > demand[least_cost_index]:
+                X[t[1], least_cost_index] = demand[least_cost_index]
 
-                supply[t[1]] -= demand[least_cost]
-                demand[least_cost] = 0
+                supply[t[1]] -= demand[least_cost_index]
+                demand = np.append(demand[:least_cost_index], demand[least_cost_index+1:], axis=0)
             
-            elif supply[t[1]] == demand[least_cost]:
-                X[t[1], least_cost] = demand[least_cost]
+            elif supply[t[1]] == demand[least_cost_index]:
+                X[t[1], least_cost_index] = demand[least_cost_index]
 
                 supply[t[1]] = 0
-                demand[least_cost] = 0
+                demand = np.append(demand[:least_cost_index], demand[least_cost_index+1:], axis=0)
 
             else:
-                X[t[1], least_cost] = supply[t[1]]
-                
-                demand[least_cost] -= supply[t[1]]
-                supply[t[1]] = 0 
+                X[t[1], least_cost_index] = supply[t[1]]
+
+                demand[least_cost_index] -= supply[t[1]]
+                supply = np.append(supply[:t[1]], supply[t[1]+1:], axis=0)
 
         # if one of the columns has the greatest penalties
         else:
-            least_cost = np.argmin(cost_t[t[1]])
-            if supply[t[0]] > demand[least_cost]:
-                X[t[0], least_cost] = demand[least_cost]
+            least_cost_index = np.argmin(cost_t[t[1]])
+            if demand[t[1]] > supply[least_cost_index]:
+                X[least_cost_index, t[1]] = supply[least_cost_index]
 
-                supply[t[0]] -= demand[least_cost]
-                demand[least_cost] = 0
+                demand[t[1]] -= supply[least_cost_index]
+                supply = np.append(supply[:least_cost_index], supply[least_cost_index+1:], axis=0)
             
-            elif supply[t[0]] == demand[least_cost]:
-                X[t[0], least_cost] = demand[least_cost]
+            elif demand[t[1]] == supply[least_cost_index]:
+                X[least_cost_index, t[1]] = demand[least_cost_index]
 
-                supply[t[0]] = 0
-                demand[least_cost] = 0 
+                supply = np.append(supply[:least_cost_index], supply[least_cost_index+1:], axis=0)
+                demand = np.append(demand[:t[1]], demand[t[1]+1:], axis=0)
+
+            else:
+                X[least_cost_index, t[1]] = demand[t[1]]
+                
+                supply[least_cost_index] -= demand[t[1]]
+                demand = np.append(demand[:t[1]], demand[t[1]+1:], axis=0)
+
+    return X
 
 
 def main():
     # getting input from user
+    print('Only for balanced problems!!')
     print('Enter the number of warehouses : ', end='')
     n = int(input())
     print('Enter the number of markets : ', end = '')
