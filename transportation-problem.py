@@ -2,28 +2,27 @@ import numpy as np
 
 
 # method to return the row/column for vogel's approximation
-def vogel_penalties(cost, n, m):
+def max_penalty_index(table, n, m):
     row_penalties, col_penalties = np.array([0] * n), np.array([0] * m)
 
-    # getting penalties for rows
+    # calculating penalties for rows
     for i in range(n):
-        row = np.sort(cost[i])
-        row_penalties[i] = row[-1] - row[-2]
-    cost = cost.transpose()
+        row = np.sort(table[i])
+        row_penalties[i] = row[1] - row[0]
+    table = table.transpose()
 
-    # getting penalties for columns
+    # calculating penalties for columns
     for i in range(m):
-        col = np.sort(cost[i])
-        col_penalties[i] = col[-1] - col[-2]
-    
+        col = np.sort(table[i])
+        col_penalties[i] = col[1] - col[0]
+
+    # return the row/column with greatest penalty
     row_max = np.argmax(row_penalties)
     col_max = np.argmax(col_penalties)
-
     if row_penalties[row_max] > col_penalties[col_max]:
         return (0, row_max)
     else:
         return (1, col_max)
-
 
 # method to perform vogel's approximation
 def vogel_approximation(cost, n, m, supply, demand):
@@ -31,58 +30,93 @@ def vogel_approximation(cost, n, m, supply, demand):
     # X is storing values of x[i,j]
     X = np.zeros((n,m))
 
-    cost_t = cost.transpose()
+    # keeping track of basic variables
+    basics = [[-1, -1]] * (n+m-1)
+    basics = np.array(basics)
+    basics_counter = 0
+
+    cost_replacement = np.amax(cost) + 1
 
     # applying till all supplies are transported, as problem is balanced
-    while sum(supply) > 0:
+    while basics_counter < n+m-1:
 
         # getting the penalties
-        t = vogel_penalties(cost, n, m)
+        t = max_penalty_index(cost, n, m)
 
-        # if one of the rows has greatest pernalty
+        # if one of the rows has greatest penalty
+        # meaning t[1] will correspond to a row index
         if t[0] == 0:
-            least_cost_index = np.argmin(cost[t[1]])
+            least_cost_col_index = np.argmin(cost[t[1]])
 
-            if supply[t[1]] > demand[least_cost_index]:
-                X[t[1], least_cost_index] = demand[least_cost_index]
+            # if supply > demand
+            if supply[t[1]] > demand[least_cost_col_index]:
+                X[t[1], least_cost_col_index] = demand[least_cost_col_index]
 
-                supply[t[1]] -= demand[least_cost_index]
-                demand = np.append(demand[:least_cost_index], demand[least_cost_index+1:], axis=0)
+                supply[t[1]] -= demand[least_cost_col_index]
+                demand[least_cost_col_index] = 0
+
+                cost[:, least_cost_col_index] = cost_replacement
             
-            elif supply[t[1]] == demand[least_cost_index]:
-                X[t[1], least_cost_index] = demand[least_cost_index]
+            # if supply == demand are equal at that point
+            elif supply[t[1]] == demand[least_cost_col_index]:
+                X[t[1], least_cost_col_index] = demand[least_cost_col_index]
 
                 supply[t[1]] = 0
-                demand = np.append(demand[:least_cost_index], demand[least_cost_index+1:], axis=0)
+                demand[least_cost_col_index] = 0
 
+                cost[t[1]] = cost_replacement
+                cost[:, least_cost_col_index] = cost_replacement
+
+            # if demand > supply
             else:
-                X[t[1], least_cost_index] = supply[t[1]]
+                X[t[1], least_cost_col_index] = supply[t[1]]
 
-                demand[least_cost_index] -= supply[t[1]]
-                supply = np.append(supply[:t[1]], supply[t[1]+1:], axis=0)
+                demand[least_cost_col_index] -= supply[t[1]]
+                supply[t[1]] = 0
+
+                cost[t[1]] = cost_replacement
+
+            basics[basics_counter] = [t[1], least_cost_col_index]
 
         # if one of the columns has the greatest penalties
+        # meaning t[1] will correspond to a column index
         else:
-            least_cost_index = np.argmin(cost_t[t[1]])
-            if demand[t[1]] > supply[least_cost_index]:
-                X[least_cost_index, t[1]] = supply[least_cost_index]
+            least_cost_row_index = np.argmin(cost[:,t[1]])
 
-                demand[t[1]] -= supply[least_cost_index]
-                supply = np.append(supply[:least_cost_index], supply[least_cost_index+1:], axis=0)
+            # if demand > supply
+            if demand[t[1]] > supply[least_cost_row_index]:
+                X[least_cost_row_index, t[1]] = supply[least_cost_row_index]
+
+                demand[t[1]] -= supply[least_cost_row_index]
+                supply[least_cost_row_index] = 0
+
+                cost[:,t[1]] = cost_replacement
             
-            elif demand[t[1]] == supply[least_cost_index]:
-                X[least_cost_index, t[1]] = demand[least_cost_index]
+            # if demand == supply
+            elif demand[t[1]] == supply[least_cost_row_index]:
+                X[least_cost_row_index, t[1]] = demand[t[1]]
 
-                supply = np.append(supply[:least_cost_index], supply[least_cost_index+1:], axis=0)
-                demand = np.append(demand[:t[1]], demand[t[1]+1:], axis=0)
-
-            else:
-                X[least_cost_index, t[1]] = demand[t[1]]
+                supply[least_cost_row_index] = 0
+                demand[t[1]] = 0
                 
-                supply[least_cost_index] -= demand[t[1]]
-                demand = np.append(demand[:t[1]], demand[t[1]+1:], axis=0)
+                cost[:,t[1]] = cost_replacement
+                cost[least_cost_row_index] = cost_replacement
 
-    return X
+            # if demand < supply
+            else:
+                X[least_cost_row_index, t[1]] = demand[t[1]]
+                
+                supply[least_cost_row_index] -= demand[t[1]]
+                demand[t[1]] = 0
+
+                cost[t[1]] = cost_replacement
+                cost[:, least_cost_row_index] = cost_replacement
+
+            basics[basics_counter] = [least_cost_row_index, t[1]]
+        
+        basics_counter += 1
+
+    return X, basics
 
 
 def main():
@@ -104,7 +138,7 @@ def main():
     cost = np.array([list(map(int,input().split())) for i in range(n)])
     
     # performing vogel's approximation for initial basic feasible solution
-    X = vogel_approximation(cost, n, m, supply, demand)
+    X, basics = vogel_approximation(cost, n, m, supply, demand)
     
 if __name__ == '__main__':
     main()
