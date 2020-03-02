@@ -24,14 +24,14 @@ def max_penalty_index(table, n, m):
     else:
         return (1, col_max)
 
-# method to perform vogel's approximation
+
 def vogel_approximation(cost, n, m, supply, demand):
     
     # X is storing values of x[i,j]
     X = np.zeros((n,m))
 
     # keeping track of basic variables
-    basics = [[-1, -1]] * (n+m-1)
+    basics = [[np.nan, np.nan]] * (n+m-1)
     basics = np.array(basics)
     basics_counter = 0
 
@@ -90,7 +90,7 @@ def vogel_approximation(cost, n, m, supply, demand):
                 demand[t[1]] -= supply[least_cost_row_index]
                 supply[least_cost_row_index] = 0
 
-                cost[:,t[1]] = cost_replacement
+                cost[least_cost_row_index] = cost_replacement
             
             # if demand == supply
             elif demand[t[1]] == supply[least_cost_row_index]:
@@ -109,8 +109,7 @@ def vogel_approximation(cost, n, m, supply, demand):
                 supply[least_cost_row_index] -= demand[t[1]]
                 demand[t[1]] = 0
 
-                cost[t[1]] = cost_replacement
-                cost[:, least_cost_row_index] = cost_replacement
+                cost[:,t[1]] = cost_replacement
 
             basics[basics_counter] = [least_cost_row_index, t[1]]
         
@@ -119,6 +118,102 @@ def vogel_approximation(cost, n, m, supply, demand):
     return X, basics
 
 
+# North-west method for testing the UV method 
+# (VAM almost always gives perfect solution, so can't test further)
+def NWmethod(costs, n, m, supply, demand):
+    X = np.zeros((n,m))
+    basics = []
+    x, y = 0, 0
+
+    for i in range(m+n-1):
+        basics.append([x,y])
+        if supply[x] > demand[y]:
+            X[x,y] = demand[y]
+            supply[x] -= demand[y]
+            demand[y] = 0
+            y += 1
+        elif demand[y] == supply[x]:
+            X[x,y] = demand[y]
+            demand[y] = 0
+            supply[x] = 0
+            x += 1
+            y += 1
+        else:
+            X[x,y] = supply[x]
+            demand[y] -= supply[x]
+            supply[x] = 0
+            x += 1
+    
+    basics = np.array(basics)
+    return X, basics 
+
+
+# function for loop for find U and V
+# function for loop for find U and V
+def checkUV(U, V):
+    return any(np.isnan(U)) or any(np.isnan(V))
+
+
+# functiond for UV method
+def getProfits(X, basics, cost, n, m):
+    U = np.array([np.nan] * n)
+    V = np.array([np.nan] * m)
+
+    # setting U_1 to 0 to find rest all
+    U[int(basics[0,0])] = 0
+    
+    # iteratively going over entire U and V to
+    # use the one that have solution to sole the rest
+    while checkUV(U, V):
+
+        # checking U and V values which are filled
+        for i1,j1 in basics:
+            i,j = int(i1), int(j1)
+            if np.isnan(U[i]) and not np.isnan(V[j]):
+                U[i] = cost[i,j] - V[j]
+                
+            elif np.isnan(V[j]) and not np.isnan(U[i]):
+                V[j] = cost[i,j] - U[i]
+
+    profits = np.zeros((n,m))
+
+    for i in range(n):
+        for j in range(m):
+            profits[i,j] = cost[i,j] - U[i] - V[j]
+
+    return profits
+
+
+# function to check optimal condition
+def checkOptimalCondition(profits):
+    for i in profits:
+        for j in i:
+            if j < 0:
+                return True
+    return False
+
+
+# method to count occurences of a single element in 1D array
+# because numpy doesn't have one
+def getCount(arr, elem):
+    count = 0
+    for i in arr:
+        if i == elem:
+            count += 1
+    return count
+
+# method to find points that form the loop
+def getLoopPoints(X, basics, r, c, n, m):
+    X[r,c] = 1
+    basics = np.append([r,c], basics, axis=0)
+
+    while True:
+        x = basics[:,0]
+        y = basics[:,1]
+        
+    
+
+# main method
 def main():
     # getting input from user
     print('Only for balanced problems!!')
@@ -139,6 +234,19 @@ def main():
     
     # performing vogel's approximation for initial basic feasible solution
     X, basics = vogel_approximation(cost, n, m, supply, demand)
+
+    # getting profits for the first time
+    profits = getProfits(X, basics, cost)
+
+    # applying UV method iteratively
+    while checkOptimalCondition(profits):
+        t = np.argmin(profits)
+        r,c = t//n, t%m
+        X2 = getLoopPoints(X, basics, r, c, n, m)
+
+        profits = getProfits(X, basics, cost)
+
+    print(X)
     
 if __name__ == '__main__':
     main()
